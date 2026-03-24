@@ -1,0 +1,55 @@
+services:
+  kafka:
+    image: apache/kafka:4.2.0
+    container_name: kafka-broker
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft single-node (combined controller + broker)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Share Groups — require for KIP-932
+      KAFKA_GROUP_COORDINATOR_REBALANCE_PROTOCOLS: classic,consumer,share
+      KAFKA_GROUP_SHARE_DELIVERY_COUNT_LIMIT: 5
+      KAFKA_GROUP_SHARE_RECORD_LOCK_DURATION_MS: 30000
+      # Default Topic
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_NUM_PARTITIONS: 3
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 | grep -q 'ApiVersion'"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # Activation de la feature share groups après démarrage du broker
+  kafka-init:
+    image: apache/kafka:4.2.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo "⏳ Waiting for Kafka broker to be fully ready..."
+        # Retry loop — attend que le broker accepte les connexions
+        for i in $(seq 1 30); do
+          /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 > /dev/null 2>&1 && break
+          echo "  Attempt $i/30 — broker not ready yet, retrying in 5s..."
+          sleep 5
+        done
+        echo "✅ Broker ready!"
+        echo "⏳ Enabling share groups feature..."
+        /opt/kafka/bin/kafka-features.sh --bootstrap-server kafka:9092 upgrade --feature share.version=1
+        echo "✅ Share groups enabled!"
+        echo "📦 Creating topics..."
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --topic notifications --partitions 3 --replication-factor 1 --if-not-exists
+        echo "✅ Topic 'notifications' created."
