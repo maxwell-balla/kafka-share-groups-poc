@@ -24,9 +24,6 @@ public class NotificationProducer {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    /**
-     * POST /api/notifications — envoie une notification unique
-     */
     @PostMapping
     public NotificationRequest send(@RequestBody NotificationRequest request) {
         kafkaTemplate.send(KafkaConfig.TOPIC, request.id(), request);
@@ -35,13 +32,6 @@ public class NotificationProducer {
         return request;
     }
 
-    /**
-     * POST /api/notifications/burst?count=50 — envoie un burst de notifications de test
-     *
-     * C'est ici que le Share Group brille : avec un consumer group classique sur 3 partitions,
-     * tu serais limité à 3 consumers parallèles. Avec le Share Group, les 50 messages
-     * sont distribués dynamiquement entre tous les workers disponibles.
-     */
     @PostMapping("/burst")
     public List<String> sendBurst(@RequestParam(defaultValue = "50") int count) {
         List<String> ids = new ArrayList<>();

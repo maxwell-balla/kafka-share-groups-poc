@@ -8,8 +8,9 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.ShareKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
 
@@ -22,13 +23,6 @@ public class KafkaConfig {
 
     public static final String TOPIC = "notifications";
     public static final String SHARE_GROUP = "notification-workers";
-
-    /**
-     * Le préfixe "share:" est ce qui active le mode Share Group.
-     * Sans ce préfixe → consumer group classique.
-     * Avec ce préfixe → queue (KIP-932).
-     */
-    public static final String SHARE_GROUP_ID = "share:" + SHARE_GROUP;
 
     @Bean
     public ProducerFactory<String, NotificationRequest> producerFactory() {
@@ -45,27 +39,21 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConsumerFactory<String, NotificationRequest> shareConsumerFactory() {
+    public ShareConsumerFactory<String, NotificationRequest> shareConsumerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "com.maxwell.poc.notification.model");
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, SHARE_GROUP_ID);
-        return new DefaultKafkaConsumerFactory<>(props);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, SHARE_GROUP);
+        return new DefaultShareConsumerFactory<>(props);
     }
 
-    /**
-     * Container factory configuré pour le mode Share Consumer.
-     * concurrency = 3 → 3 threads consomment en parallèle dans le même share group.
-     * Sur un topic à 3 partitions, un consumer group classique serait limité à 3 consumers.
-     * Avec un share group, on pourrait monter à 10, 50, 100... sans repartitionner.
-     */
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, NotificationRequest> shareGroupContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, NotificationRequest> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(shareConsumerFactory());
+    public ShareKafkaListenerContainerFactory<String, NotificationRequest> shareGroupContainerFactory() {
+        ShareKafkaListenerContainerFactory<String, NotificationRequest> factory =
+                new ShareKafkaListenerContainerFactory<>(shareConsumerFactory());
+        factory.getContainerProperties().setExplicitShareAcknowledgment(true);
         factory.setConcurrency(3);
         return factory;
     }
