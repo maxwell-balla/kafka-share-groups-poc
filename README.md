@@ -119,21 +119,6 @@ kafka-share-groups-poc/
 
 ---
 
-## Points clés à retenir
-
-1. **`groupId = "share:notification-workers"`** — le préfixe `share:` est ce qui active
-   le mode Share Group sur le `@KafkaListener`. Sans ce préfixe, c'est un consumer group classique.
-
-2. **`concurrency = 3`** dans le container factory — mais contrairement à un consumer group,
-   tu pourrais mettre 10, 50, 100 sans toucher au nombre de partitions.
-
-3. **Spring Kafka 4.1.0-M2 est une milestone** — à utiliser pour le POC et les tests, pas en prod.
-   La GA intégrera le error handling complet et le RENEW acknowledgment finalisé.
-
-4. **Kafka 4.0 et 4.1 ne sont PAS compatibles** pour les Share Groups. Ce POC utilise 4.2.0 (GA).
-
----
-
 ## Pour aller plus loin
 
 - [Spring Kafka — Share Consumer docs](https://docs.spring.io/spring-kafka/reference/kafka/kafka-queues.html)
