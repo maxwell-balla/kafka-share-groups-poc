@@ -45,6 +45,7 @@ public class KafkaConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "com.maxwell.poc.notification.model");
+        props.put("share.acknowledgement.mode", "explicit");
         props.put(ConsumerConfig.GROUP_ID_CONFIG, SHARE_GROUP);
         return new DefaultShareConsumerFactory<>(props);
     }
@@ -53,7 +54,6 @@ public class KafkaConfig {
     public ShareKafkaListenerContainerFactory<String, NotificationRequest> shareGroupContainerFactory() {
         ShareKafkaListenerContainerFactory<String, NotificationRequest> factory =
                 new ShareKafkaListenerContainerFactory<>(shareConsumerFactory());
-        factory.getContainerProperties().setExplicitShareAcknowledgment(true);
         factory.setConcurrency(3);
         return factory;
     }
